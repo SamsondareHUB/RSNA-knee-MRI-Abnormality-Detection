@@ -35,6 +35,19 @@ from MRI images.
 11. Contusion
 12. Fracture
 
+## Experiment Matrix
+### Experiment 001 — Baseline
+- Model: ResNet50 slice encoder + mean pooling
+- Input: all MRI slices in a study (resized to 224×224)
+- Output: 12 probabilities (one per abnormality)
+- Loss: binary cross-entropy
+- Optimizer: AdamW
+- Learning rate: 1e-4
+- Batch size: 8 or 16 (depending on GPU)
+- Epochs: 10
+- Metric: macro AUC + per-label AUROC
+- Notes: patient-level train/val/test split; no test use for tuning
+
 ## Primary Metric
 Macro-averaged ROC-AUC across all 12 labels.
 
