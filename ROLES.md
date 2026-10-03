@@ -24,6 +24,8 @@
 - Generates Grad-CAM or attention visualizations
 
 ## Member 5 — Clinical Writer & Research Reviewer
+**Assigned to:** Christian, Apsari Fernando
+
 - Conducts literature review
 - Explains clinical meaning of the 12 abnormalities
 - Drafts Introduction, Related Work, Discussion, and Limitations
