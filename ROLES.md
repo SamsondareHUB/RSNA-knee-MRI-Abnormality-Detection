@@ -13,11 +13,13 @@
 - Documents dataset structure and label distribution
 
 ## Member 3 — MRI Modeling Engineer
+- Names: 
 - Implements and trains baseline and improved models
 - Manages checkpoints, seeds, GPU runs, and experiment tracking
 - Reports training results and model versions
 
 ## Member 4 — Evaluation & Explainability Lead
+- Names: Aditya B
 - Implements macro AUC and per-label AUROC
 - Creates result tables and plots
 - Performs error analysis and calibration checks
