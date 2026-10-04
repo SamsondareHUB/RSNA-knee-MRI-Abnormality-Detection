@@ -1,0 +1,67 @@
+{
+  "generated_at": "2026-10-03T16:06:42.968213",
+  "seed": 42,
+  "split_method": "patient-level + scanner-grouped",
+  "total_studies": 4407,
+  "total_patients": 4407,
+  "total_scanners": 1,
+  "splits": {
+    "train": {
+      "studies": 3084,
+      "patients": 3084,
+      "pct": 70.0,
+      "label_positive_rates": {
+        "ACL": 0.6,
+        "MCL": 0.2,
+        "Medial Meniscus": 0.7,
+        "Lateral Meniscus": 0.6,
+        "Medial OA": 0.3,
+        "Lateral OA": 0.3,
+        "PF OA": 0.4,
+        "Effusion": 0.8,
+        "Synovitis": 0.7,
+        "Baker's": 0.3,
+        "Contusion": 0.5,
+        "Fracture": 0.4
+      }
+    },
+    "val": {
+      "studies": 661,
+      "patients": 661,
+      "pct": 15.0,
+      "label_positive_rates": {
+        "ACL": 0.5,
+        "MCL": 0.0,
+        "Medial Meniscus": 0.6,
+        "Lateral Meniscus": 0.6,
+        "Medial OA": 0.6,
+        "Lateral OA": 0.3,
+        "PF OA": 0.6,
+        "Effusion": 0.6,
+        "Synovitis": 0.6,
+        "Baker's": 0.5,
+        "Contusion": 0.3,
+        "Fracture": 0.3
+      }
+    },
+    "test": {
+      "studies": 662,
+      "patients": 662,
+      "pct": 15.0,
+      "label_positive_rates": {
+        "ACL": 0.5,
+        "MCL": 0.3,
+        "Medial Meniscus": 0.2,
+        "Lateral Meniscus": 0.2,
+        "Medial OA": 0.2,
+        "Lateral OA": 0.0,
+        "PF OA": 0.6,
+        "Effusion": 0.8,
+        "Synovitis": 0.3,
+        "Baker's": 0.2,
+        "Contusion": 0.2,
+        "Fracture": 0.5
+      }
+    }
+  }
+}
