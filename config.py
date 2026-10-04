@@ -1,13 +1,17 @@
 """config.py — Member 2 configuration."""
 
 from pathlib import Path
+
+
 # 1. PATHS
+
 DATA_ROOT  = Path("./data")
 LABELS_CSV = DATA_ROOT / "train.csv"
 SERIES_CSV = DATA_ROOT / "train_series.csv"
 
 
 # 2. COLUMN NAMES
+
 STUDY_ID_COL     = "StudyInstanceUID"
 PATIENT_ID_COL   = None
 MANUFACTURER_COL = None
@@ -40,3 +44,8 @@ VAL_RATIO   = 0.15
 TEST_RATIO  = 0.15
 
 OUTPUT_DIR  = Path("./member2_work/outputs")
+
+
+# 5. LABEL HANDLING
+
+USE_GOLD_LABELED_ONLY_FOR_RATES = True
