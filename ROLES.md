@@ -7,7 +7,7 @@
 - Integrates the final manuscript, code, figures, and tables
 
 ## Member 2 — Data Engineer
--Name:AUNG KO KO OO
+- Names:AUNG KO KO OO
 - Downloads and verifies the RSNA dataset
 - Builds preprocessing and data-loading pipeline
 - Creates the train/validation/test split
