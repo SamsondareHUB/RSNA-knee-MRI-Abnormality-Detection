@@ -3,8 +3,13 @@ run_member2.py — Member 2 pipeline.
 
 Patient-level split + label distribution.
 
+Correctly handles unlabeled studies:
+- split_assignments.csv keeps ALL studies (Member 3 needs them)
+- label_distribution.csv reports gold-labeled rates + overall rates
+- split_summary.json reports labeled vs unlabeled counts
+
 Run:
-python run_member2.py
+    python run_member2.py
 """
 
 import json
@@ -23,8 +28,10 @@ from config import (
     OUTPUT_DIR,
 )
 
-# STEP 0 — VERIFY INPUTS
 
+# ============================================================
+# STEP 0 — VERIFY INPUTS
+# ============================================================
 def verify_inputs():
     print("=" * 60)
     print("STEP 0 — VERIFY INPUTS")
@@ -41,8 +48,10 @@ def verify_inputs():
     print("Inputs OK\n")
     return has_series
 
-# STEP 1 — LOAD LABELS
 
+# ============================================================
+# STEP 1 — LOAD LABELS
+# ============================================================
 def load_labels():
     print("[1/7] Loading labels CSV...")
     df = pd.read_csv(LABELS_CSV)
@@ -65,8 +74,9 @@ def load_labels():
     return df
 
 
+# ============================================================
 # STEP 2 — LOAD SERIES METADATA
-
+# ============================================================
 def load_series(has_series):
     print("[2/7] Loading series metadata...")
     if not has_series:
@@ -88,8 +98,9 @@ def load_series(has_series):
     return df
 
 
+# ============================================================
 # STEP 3 — MERGE
-
+# ============================================================
 def merge_data(labels_df, series_df):
     print("[3/7] Merging...")
     if series_df.empty:
@@ -100,29 +111,23 @@ def merge_data(labels_df, series_df):
     return merged
 
 
-# STEP 4 — GROUP IDs (FIXED)
-
+# ============================================================
+# STEP 4 — GROUP IDs
+# ============================================================
 def add_group_ids(df):
-    """
-    Create patient_id and scanner_id.
-
-    FIXED: When PATIENT_ID_COL is None, use StudyInstanceUID directly
-    (RSNA Knee: 1 study = 1 patient). Do NOT use rsplit on the UID,
-    because all StudyInstanceUIDs share the same prefix.
-    """
+    """Create patient_id and scanner_id."""
     print("[4/7] Creating group IDs...")
     df = df.copy()
 
-    # ---- Patient ID ----
+    # Patient ID
     if PATIENT_ID_COL and PATIENT_ID_COL in df.columns:
         df["patient_id"] = df[PATIENT_ID_COL].astype(str)
         print(f"      patient_id from '{PATIENT_ID_COL}'")
     else:
-        # RSNA Knee: each StudyInstanceUID represents one patient
         df["patient_id"] = df[STUDY_ID_COL].astype(str)
         print("      patient_id = StudyInstanceUID (1 study = 1 patient)")
 
-    # ---- Scanner ID ----
+    # Scanner ID
     if MANUFACTURER_COL and MANUFACTURER_COL in df.columns:
         mfr = df[MANUFACTURER_COL].astype(str)
     else:
@@ -141,15 +146,14 @@ def add_group_ids(df):
     print(f"      unique scanners: {n_scan}\n")
 
     if n_pat < 3:
-        raise ValueError(
-            f"Only {n_pat} patient groups — split will fail.\n"
-            f"Sample IDs: {df['patient_id'].head(5).tolist()}"
-        )
+        raise ValueError(f"Only {n_pat} patient groups — split will fail")
 
     return df
 
-# STEP 5 — PATIENT-LEVEL SPLIT
 
+# ============================================================
+# STEP 5 — PATIENT-LEVEL SPLIT
+# ============================================================
 def create_splits(df, seed):
     print(f"[5/7] Splitting (seed={seed})...")
     df = df.copy().reset_index(drop=True)
@@ -180,9 +184,9 @@ def create_splits(df, seed):
     return result
 
 
-
-# STEP 6 — LEAKAGE CHECK + DISTRIBUTION
-
+# ============================================================
+# STEP 6 — LEAKAGE CHECK
+# ============================================================
 def verify_no_leakage(df):
     print("[6/7] Verifying no leakage...")
     leakage = df.groupby("patient_id")["split"].nunique()
@@ -194,63 +198,132 @@ def verify_no_leakage(df):
     return True
 
 
+# ============================================================
+# STEP 6b — LABEL DISTRIBUTION (GOLD-LABELED + OVERALL)
+# ============================================================
 def compute_distribution(df):
+    """
+    Compute label distribution with two denominators:
+
+    1. GOLD-LABELED  — only studies with at least one non-NaN label
+    2. OVERALL       — all studies (NaN treated as 0)
+    """
     print("[6b/7] Computing distribution...")
+
+    # Identify gold-labeled studies
+    label_frame   = df[LABELS]
+    has_any_label = label_frame.notna().any(axis=1)
+    n_total = len(df)
+    n_gold  = int(has_any_label.sum())
+
+    print(f"      total studies:        {n_total}")
+    print(f"      gold-labeled studies: {n_gold}")
+    print(f"      unlabeled studies:    {n_total - n_gold}\n")
+
     rows = []
     for label in LABELS:
         row = {"Label": label}
+
+        # ---- OVERALL (NaN → 0) ----
+        series_all = pd.to_numeric(df[label], errors="coerce").fillna(0).astype(int)
         for split in ["train", "val", "test"]:
             sub   = df[df["split"] == split]
-            pos   = int(sub[label].sum())
+            idx   = sub.index
+            pos   = int(series_all.loc[idx].sum())
             total = len(sub)
-            row[f"{split}_pos"] = pos
-            row[f"{split}_neg"] = total - pos
-            row[f"{split}_pct"] = round(100 * pos / total, 1) if total else 0.0
-        row["overall_pos"] = int(df[label].sum())
-        row["overall_pct"] = round(100 * df[label].sum() / len(df), 1)
+            row[f"{split}_pos_overall"] = pos
+            row[f"{split}_pct_overall"] = round(100 * pos / total, 1) if total else 0.0
+        row["overall_pos_overall"] = int(series_all.sum())
+        row["overall_pct_overall"] = round(
+            100 * series_all.sum() / n_total, 1
+        ) if n_total else 0.0
+
+        # ---- GOLD-LABELED ONLY ----
+        series_gold = pd.to_numeric(df[label], errors="coerce")
+        for split in ["train", "val", "test"]:
+            mask  = (df["split"] == split) & series_gold.notna()
+            n_lab = int(mask.sum())
+            pos   = int((series_gold[mask] == 1).sum())
+            row[f"{split}_pos_gold"] = pos
+            row[f"{split}_n_gold"]   = n_lab
+            row[f"{split}_pct_gold"] = round(100 * pos / n_lab, 1) if n_lab else 0.0
+
+        gold_mask = series_gold.notna()
+        n_lab_all = int(gold_mask.sum())
+        pos_all   = int((series_gold[gold_mask] == 1).sum())
+        row["overall_pos_gold"] = pos_all
+        row["overall_n_gold"]   = n_lab_all
+        row["overall_pct_gold"] = round(
+            100 * pos_all / n_lab_all, 1
+        ) if n_lab_all else 0.0
+
         rows.append(row)
+
     print("      done\n")
     return pd.DataFrame(rows)
 
 
+# ============================================================
 # STEP 7 — SAVE OUTPUTS
-
+# ============================================================
 def save_outputs(df, dist, output_dir):
     print("[7/7] Saving...")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. split_assignments.csv
+    # ---- 1. split_assignments.csv ----
+    # All studies (labeled + unlabeled) — Member 3 needs the full list
     split_path = output_dir / "split_assignments.csv"
     cols = [STUDY_ID_COL, "patient_id", "scanner_id", "split"] + LABELS
     cols = [c for c in cols if c in df.columns]
     df[cols].to_csv(split_path, index=False)
     print(f"      {split_path}")
 
-    # 2. label_distribution.csv
+    # ---- 2. label_distribution.csv ----
     dist_path = output_dir / "label_distribution.csv"
     dist.to_csv(dist_path, index=False)
     print(f"      {dist_path}")
 
-    # 3. split_summary.json
+    # ---- 3. split_summary.json ----
+    label_frame = df[LABELS]
+    n_gold = int(label_frame.notna().any(axis=1).sum())
+
     summary = {
-        "generated_at":   datetime.now().isoformat(),
-        "seed":           SEED,
-        "split_method":   "patient-level + scanner-grouped",
-        "total_studies":  len(df),
-        "total_patients": int(df["patient_id"].nunique()),
-        "total_scanners": int(df["scanner_id"].nunique()),
+        "generated_at":      datetime.now().isoformat(),
+        "seed":              SEED,
+        "split_method":      "patient-level + scanner-grouped",
+        "total_studies":     len(df),
+        "total_patients":    int(df["patient_id"].nunique()),
+        "total_scanners":    int(df["scanner_id"].nunique()),
+        "labeled_studies":   n_gold,
+        "unlabeled_studies": len(df) - n_gold,
         "splits": {},
     }
+
     for split in ["train", "val", "test"]:
-        sub = df[df["split"] == split]
+        sub             = df[df["split"] == split]
+        sub_label_frame = sub[LABELS]
+        sub_gold        = int(sub_label_frame.notna().any(axis=1).sum())
+
+        # Gold-only rates per label
+        gold_rates = {}
+        for label in LABELS:
+            series = pd.to_numeric(sub[label], errors="coerce")
+            mask   = series.notna()
+            n_lab  = int(mask.sum())
+            pos    = int((series[mask] == 1).sum())
+            gold_rates[label] = {
+                "n_labeled":  n_lab,
+                "n_positive": pos,
+                "rate_pct":   round(100 * pos / n_lab, 1) if n_lab else 0.0,
+            }
+
         summary["splits"][split] = {
-            "studies":  len(sub),
-            "patients": int(sub["patient_id"].nunique()),
-            "pct":      round(100 * len(sub) / len(df), 1),
-            "label_positive_rates": {
-                label: round(100 * sub[label].sum() / len(sub), 1)
-                for label in LABELS
-            },
+            "studies":            len(sub),
+            "patients":           int(sub["patient_id"].nunique()),
+            "pct":                round(100 * len(sub) / len(df), 1),
+            "labeled_studies":    sub_gold,
+            "unlabeled_studies":  len(sub) - sub_gold,
+            "gold_labeled_rates": gold_rates,
         }
 
     summary_path = output_dir / "split_summary.json"
@@ -260,9 +333,9 @@ def save_outputs(df, dist, output_dir):
     return summary
 
 
-
+# ============================================================
 # MAIN
-
+# ============================================================
 def main():
     print("=" * 60)
     print("MEMBER 2 — END-TO-END")
@@ -281,21 +354,32 @@ def main():
     dist    = compute_distribution(merged)
     summary = save_outputs(merged, dist, OUTPUT_DIR)
 
+    # ---- Final report ----
     print("=" * 60)
     print("SPLIT SUMMARY")
     print("=" * 60)
-    print(f"Total studies:  {summary['total_studies']}")
-    print(f"Total patients: {summary['total_patients']}")
-    print(f"Total scanners: {summary['total_scanners']}\n")
+    print(f"Total studies:       {summary['total_studies']}")
+    print(f"Total patients:      {summary['total_patients']}")
+    print(f"Total scanners:      {summary['total_scanners']}")
+    print(f"Labeled studies:     {summary['labeled_studies']}")
+    print(f"Unlabeled studies:   {summary['unlabeled_studies']}\n")
     for split, info in summary["splits"].items():
-        print(f"  {split:6s}: {info['studies']:5d} studies | "
-            f"{info['patients']:5d} patients | {info['pct']:5.1f}%")
+        print(f"  {split:6s}: {info['studies']:5d} studies "
+            f"({info['labeled_studies']} labeled) | "
+            f"{info['pct']:5.1f}%")
 
     print("\n" + "=" * 60)
-    print("LABEL DISTRIBUTION")
+    print("LABEL DISTRIBUTION — GOLD-LABELED ONLY (corrected)")
     print("=" * 60)
-    print(dist[["Label", "train_pct", "val_pct", "test_pct"]]
+    print(dist[["Label",
+                "train_pct_gold", "val_pct_gold", "test_pct_gold",
+                "overall_pct_gold", "overall_n_gold"]]
         .to_string(index=False))
+
+    print("\n" + "=" * 60)
+    print("LABEL DISTRIBUTION — OVERALL (NaN treated as 0, reference)")
+    print("=" * 60)
+    print(dist[["Label", "overall_pct_overall"]].to_string(index=False))
 
     print("\n" + "=" * 60)
     print("DELIVERABLES")
