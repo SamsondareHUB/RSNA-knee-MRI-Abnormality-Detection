@@ -41,3 +41,14 @@
 - Plan:
   - Explicitly allocate gold-labeled studies across splits.
   - Then distribute the remaining (non-gold) studies to reach desired split sizes.
+ 
+  - ## Decision 6 — Approved split for Experiment 001
+
+- Date: 2026-10-05
+- Split summary:
+  - Train: 3,085 studies (30 gold)
+  - Val: 661 studies (14 gold)
+  - Test: 661 studies (14 gold)
+- All 12 abnormalities have at least 1 positive in each split.
+- Some labels are rare in val/test (e.g., Lateral OA, MCL injury, Baker’s cyst), so AUROC estimates for those labels will have higher variance. This is acceptable for a first baseline.
+- Decision: Use this split for Experiment 001 and subsequent experiments unless a major issue arises.
