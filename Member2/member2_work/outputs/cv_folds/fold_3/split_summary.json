@@ -1,0 +1,219 @@
+{
+  "generated_at": "2026-10-05T20:14:23.282238",
+  "seed": 42,
+  "split_method": "patient-level + scanner-grouped",
+  "total_studies": 4407,
+  "total_patients": 4407,
+  "total_scanners": 1,
+  "labeled_studies": 58,
+  "unlabeled_studies": 4349,
+  "splits": {
+    "train": {
+      "studies": 4395,
+      "patients": 4395,
+      "pct": 99.7,
+      "labeled_studies": 46,
+      "unlabeled_studies": 4349,
+      "gold_labeled_rates": {
+        "ACL": {
+          "n_labeled": 46,
+          "n_positive": 22,
+          "rate_pct": 47.8
+        },
+        "MCL": {
+          "n_labeled": 46,
+          "n_positive": 8,
+          "rate_pct": 17.4
+        },
+        "Medial Meniscus": {
+          "n_labeled": 46,
+          "n_positive": 21,
+          "rate_pct": 45.7
+        },
+        "Lateral Meniscus": {
+          "n_labeled": 46,
+          "n_positive": 21,
+          "rate_pct": 45.7
+        },
+        "Medial OA": {
+          "n_labeled": 46,
+          "n_positive": 12,
+          "rate_pct": 26.1
+        },
+        "Lateral OA": {
+          "n_labeled": 46,
+          "n_positive": 8,
+          "rate_pct": 17.4
+        },
+        "PF OA": {
+          "n_labeled": 46,
+          "n_positive": 15,
+          "rate_pct": 32.6
+        },
+        "Effusion": {
+          "n_labeled": 46,
+          "n_positive": 28,
+          "rate_pct": 60.9
+        },
+        "Synovitis": {
+          "n_labeled": 46,
+          "n_positive": 21,
+          "rate_pct": 45.7
+        },
+        "Baker's": {
+          "n_labeled": 46,
+          "n_positive": 10,
+          "rate_pct": 21.7
+        },
+        "Contusion": {
+          "n_labeled": 46,
+          "n_positive": 17,
+          "rate_pct": 37.0
+        },
+        "Fracture": {
+          "n_labeled": 46,
+          "n_positive": 15,
+          "rate_pct": 32.6
+        }
+      }
+    },
+    "val": {
+      "studies": 0,
+      "patients": 0,
+      "pct": 0.0,
+      "labeled_studies": 0,
+      "unlabeled_studies": 0,
+      "gold_labeled_rates": {
+        "ACL": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "MCL": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "Medial Meniscus": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "Lateral Meniscus": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "Medial OA": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "Lateral OA": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "PF OA": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "Effusion": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "Synovitis": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "Baker's": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "Contusion": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        },
+        "Fracture": {
+          "n_labeled": 0,
+          "n_positive": 0,
+          "rate_pct": 0.0
+        }
+      }
+    },
+    "test": {
+      "studies": 12,
+      "patients": 12,
+      "pct": 0.3,
+      "labeled_studies": 12,
+      "unlabeled_studies": 0,
+      "gold_labeled_rates": {
+        "ACL": {
+          "n_labeled": 12,
+          "n_positive": 2,
+          "rate_pct": 16.7
+        },
+        "MCL": {
+          "n_labeled": 12,
+          "n_positive": 1,
+          "rate_pct": 8.3
+        },
+        "Medial Meniscus": {
+          "n_labeled": 12,
+          "n_positive": 5,
+          "rate_pct": 41.7
+        },
+        "Lateral Meniscus": {
+          "n_labeled": 12,
+          "n_positive": 2,
+          "rate_pct": 16.7
+        },
+        "Medial OA": {
+          "n_labeled": 12,
+          "n_positive": 3,
+          "rate_pct": 25.0
+        },
+        "Lateral OA": {
+          "n_labeled": 12,
+          "n_positive": 3,
+          "rate_pct": 25.0
+        },
+        "PF OA": {
+          "n_labeled": 12,
+          "n_positive": 6,
+          "rate_pct": 50.0
+        },
+        "Effusion": {
+          "n_labeled": 12,
+          "n_positive": 7,
+          "rate_pct": 58.3
+        },
+        "Synovitis": {
+          "n_labeled": 12,
+          "n_positive": 6,
+          "rate_pct": 50.0
+        },
+        "Baker's": {
+          "n_labeled": 12,
+          "n_positive": 2,
+          "rate_pct": 16.7
+        },
+        "Contusion": {
+          "n_labeled": 12,
+          "n_positive": 2,
+          "rate_pct": 16.7
+        },
+        "Fracture": {
+          "n_labeled": 12,
+          "n_positive": 3,
+          "rate_pct": 25.0
+        }
+      }
+    }
+  }
+}

@@ -13,12 +13,19 @@ Run:
 """
 
 import json
+import sys
+import os
+
 from pathlib import Path
 from datetime import datetime
 
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import GroupShuffleSplit
+try:
+    from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
+except Exception:
+    MultilabelStratifiedKFold = None
+
 
 from config import (
     DATA_ROOT, LABELS_CSV, SERIES_CSV,
@@ -26,6 +33,8 @@ from config import (
     MANUFACTURER_COL, MODEL_COL,
     LABELS, SEED, TRAIN_RATIO, VAL_RATIO, TEST_RATIO,
     OUTPUT_DIR,
+    N_FOLDS,
+    USE_CV,
 )
 
 
@@ -73,6 +82,69 @@ def load_labels():
     print(f"      all {len(LABELS)} labels present\n")
     return df
 
+# ---------------------------------------------------------------------------
+# Helper functions for cross‑validation (Option C)
+# ---------------------------------------------------------------------------
+
+def get_gold_mask(df):
+    """Return a boolean Series where a row has at least one non‑NaN label."""
+    return df[LABELS].notna().any(axis=1)
+
+def create_cv_folds(gold_df, n_folds, seed):
+    """Create stratified CV folds on the gold‑labeled subset.
+    Returns a list of (train_idx, test_idx) tuples.
+    Falls back to random splits if MultilabelStratifiedKFold is unavailable.
+    """
+    if n_folds < 2:
+        raise ValueError("n_folds must be >= 2 for CV")
+    # Build multilabel binary matrix for stratification
+    y = gold_df[LABELS].notna().astype(int).values
+    if MultilabelStratifiedKFold:
+        mskf = MultilabelStratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+        splits = list(mskf.split(gold_df, y))
+        return [(train_idx, test_idx) for train_idx, test_idx in splits]
+    else:
+        # Simple random shuffling fallback
+        rng = np.random.RandomState(seed)
+        indices = np.arange(len(gold_df))
+        rng.shuffle(indices)
+        fold_sizes = (len(gold_df) // n_folds) * np.ones(n_folds, dtype=int)
+        fold_sizes[:len(gold_df) % n_folds] += 1
+        folds = []
+        current = 0
+        for size in fold_sizes:
+            start, stop = current, current + size
+            test_idx = indices[start:stop]
+            train_idx = np.setdiff1d(indices, test_idx, assume_unique=True)
+            folds.append((train_idx, test_idx))
+            current = stop
+        return folds
+
+def process_fold(fold_id, train_df, test_df, output_root):
+    """Process a single CV fold and write artefacts.
+    - `fold_id` is an integer (0‑based).
+    - `train_df` and `test_df` are DataFrames containing the respective rows.
+    - `output_root` is the base OUTPUT_DIR (e.g., OUTPUT_DIR / "cv_folds").
+    """
+    # Assign split identifiers
+    train_df = train_df.copy()
+    test_df = test_df.copy()
+    train_df["split"] = "train"
+    test_df["split"] = "test"
+
+    # Combine and annotate with fold number
+    combined = pd.concat([train_df, test_df])
+    combined["fold"] = fold_id
+
+    # Verify no patient leakage across splits
+    if not verify_no_leakage(combined):
+        raise RuntimeError(f"Leakage detected in CV fold {fold_id}")
+
+    # Compute distribution and save outputs
+    dist = compute_distribution(combined)
+    fold_dir = output_root / f"fold_{fold_id}"
+    save_outputs(combined, dist, fold_dir)
+    print(f"Finished CV fold {fold_id}, outputs in {fold_dir}\n")
 
 # ============================================================
 # STEP 2 — LOAD SERIES METADATA
@@ -97,6 +169,69 @@ def load_series(has_series):
     print(f"      unique studies: {len(df)}\n")
     return df
 
+# ---------------------------------------------------------------------------
+# Helper functions for cross‑validation (Option C)
+# ---------------------------------------------------------------------------
+
+def get_gold_mask(df):
+    """Return a boolean Series where a row has at least one non‑NaN label."""
+    return df[LABELS].notna().any(axis=1)
+
+def create_cv_folds(gold_df, n_folds, seed):
+    """Create stratified CV folds on the gold‑labeled subset.
+    Returns a list of (train_idx, test_idx) tuples.
+    Falls back to random splits if MultilabelStratifiedKFold is unavailable.
+    """
+    if n_folds < 2:
+        raise ValueError("n_folds must be >= 2 for CV")
+    # Build multilabel binary matrix for stratification
+    y = gold_df[LABELS].notna().astype(int).values
+    if MultilabelStratifiedKFold:
+        mskf = MultilabelStratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+        splits = list(mskf.split(gold_df, y))
+        return [(train_idx, test_idx) for train_idx, test_idx in splits]
+    else:
+        # Simple random shuffling fallback
+        rng = np.random.RandomState(seed)
+        indices = np.arange(len(gold_df))
+        rng.shuffle(indices)
+        fold_sizes = (len(gold_df) // n_folds) * np.ones(n_folds, dtype=int)
+        fold_sizes[:len(gold_df) % n_folds] += 1
+        folds = []
+        current = 0
+        for size in fold_sizes:
+            start, stop = current, current + size
+            test_idx = indices[start:stop]
+            train_idx = np.setdiff1d(indices, test_idx, assume_unique=True)
+            folds.append((train_idx, test_idx))
+            current = stop
+        return folds
+
+def process_fold(fold_id, train_df, test_df, output_root):
+    """Process a single CV fold and write artefacts.
+    - `fold_id` is an integer (0‑based).
+    - `train_df` and `test_df` are DataFrames containing the respective rows.
+    - `output_root` is the base OUTPUT_DIR (e.g., OUTPUT_DIR / "cv_folds").
+    """
+    # Assign split identifiers
+    train_df = train_df.copy()
+    test_df = test_df.copy()
+    train_df["split"] = "train"
+    test_df["split"] = "test"
+
+    # Combine and annotate with fold number
+    combined = pd.concat([train_df, test_df])
+    combined["fold"] = fold_id
+
+    # Verify no patient leakage across splits
+    if not verify_no_leakage(combined):
+        raise RuntimeError(f"Leakage detected in CV fold {fold_id}")
+
+    # Compute distribution and save outputs
+    dist = compute_distribution(combined)
+    fold_dir = output_root / f"fold_{fold_id}"
+    save_outputs(combined, dist, fold_dir)
+    print(f"Finished CV fold {fold_id}, outputs in {fold_dir}\n")
 
 # ============================================================
 # STEP 3 — MERGE
@@ -150,6 +285,69 @@ def add_group_ids(df):
 
     return df
 
+# ---------------------------------------------------------------------------
+# Helper functions for cross‑validation (Option C)
+# ---------------------------------------------------------------------------
+
+def get_gold_mask(df):
+    """Return a boolean Series where a row has at least one non‑NaN label."""
+    return df[LABELS].notna().any(axis=1)
+
+def create_cv_folds(gold_df, n_folds, seed):
+    """Create stratified CV folds on the gold‑labeled subset.
+    Returns a list of (train_idx, test_idx) tuples.
+    Falls back to random splits if MultilabelStratifiedKFold is unavailable.
+    """
+    if n_folds < 2:
+        raise ValueError("n_folds must be >= 2 for CV")
+    # Build multilabel binary matrix for stratification
+    y = gold_df[LABELS].notna().astype(int).values
+    if MultilabelStratifiedKFold:
+        mskf = MultilabelStratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+        splits = list(mskf.split(gold_df, y))
+        return [(train_idx, test_idx) for train_idx, test_idx in splits]
+    else:
+        # Simple random shuffling fallback
+        rng = np.random.RandomState(seed)
+        indices = np.arange(len(gold_df))
+        rng.shuffle(indices)
+        fold_sizes = (len(gold_df) // n_folds) * np.ones(n_folds, dtype=int)
+        fold_sizes[:len(gold_df) % n_folds] += 1
+        folds = []
+        current = 0
+        for size in fold_sizes:
+            start, stop = current, current + size
+            test_idx = indices[start:stop]
+            train_idx = np.setdiff1d(indices, test_idx, assume_unique=True)
+            folds.append((train_idx, test_idx))
+            current = stop
+        return folds
+
+def process_fold(fold_id, train_df, test_df, output_root):
+    """Process a single CV fold and write artefacts.
+    - `fold_id` is an integer (0‑based).
+    - `train_df` and `test_df` are DataFrames containing the respective rows.
+    - `output_root` is the base OUTPUT_DIR (e.g., OUTPUT_DIR / "cv_folds").
+    """
+    # Assign split identifiers
+    train_df = train_df.copy()
+    test_df = test_df.copy()
+    train_df["split"] = "train"
+    test_df["split"] = "test"
+
+    # Combine and annotate with fold number
+    combined = pd.concat([train_df, test_df])
+    combined["fold"] = fold_id
+
+    # Verify no patient leakage across splits
+    if not verify_no_leakage(combined):
+        raise RuntimeError(f"Leakage detected in CV fold {fold_id}")
+
+    # Compute distribution and save outputs
+    dist = compute_distribution(combined)
+    fold_dir = output_root / f"fold_{fold_id}"
+    save_outputs(combined, dist, fold_dir)
+    print(f"Finished CV fold {fold_id}, outputs in {fold_dir}\n")
 
 # ============================================================
 # STEP 5 — PATIENT-LEVEL SPLIT
@@ -274,6 +472,8 @@ def save_outputs(df, dist, output_dir):
     # All studies (labeled + unlabeled) — Member 3 needs the full list
     split_path = output_dir / "split_assignments.csv"
     cols = [STUDY_ID_COL, "patient_id", "scanner_id", "split"] + LABELS
+    if "fold" in df.columns:
+        cols = ["fold"] + cols
     cols = [c for c in cols if c in df.columns]
     df[cols].to_csv(split_path, index=False)
     print(f"      {split_path}")
@@ -346,13 +546,35 @@ def main():
     series_df  = load_series(has_series)
     merged     = merge_data(labels_df, series_df)
     merged     = add_group_ids(merged)
-    merged     = create_splits(merged, seed=SEED)
+    # Decide whether to run cross‑validation (Option C) or the standard single split
+    use_cv = ("--cross-validation" in sys.argv) or (os.getenv("USE_CV", "0").lower() in ("1", "true", "yes"))
+    if use_cv:
+        print("[5/7] Performing 5‑fold cross‑validation (Option C)…")
+        # Identify gold‑labeled rows
+        gold_mask = get_gold_mask(merged)
+        gold_df = merged[gold_mask]
+        # Create folds
+        cv_folds = create_cv_folds(gold_df, N_FOLDS, SEED)
+        # Base directory for CV outputs
+        cv_root = OUTPUT_DIR / "cv_folds"
+        for i, (train_idx, test_idx) in enumerate(cv_folds):
+            # Gold‑labeled training and test sets
+            train_gold = gold_df.iloc[train_idx]
+            test_gold = gold_df.iloc[test_idx]
+            # Full training set includes all unlabeled rows + training gold rows
+            train_full = pd.concat([merged[~gold_mask], train_gold])
+            # Process this fold
+            process_fold(i, train_full, test_gold, cv_root)
+        # After CV, exit (no further single‑split reporting)
+        return
+    else:
+        merged = create_splits(merged, seed=SEED)
 
-    if not verify_no_leakage(merged):
-        raise RuntimeError("Leakage detected!")
+        if not verify_no_leakage(merged):
+            raise RuntimeError("Leakage detected!")
 
-    dist    = compute_distribution(merged)
-    summary = save_outputs(merged, dist, OUTPUT_DIR)
+        dist    = compute_distribution(merged)
+        summary = save_outputs(merged, dist, OUTPUT_DIR)
 
     # ---- Final report ----
     print("=" * 60)

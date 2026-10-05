@@ -45,6 +45,10 @@ TEST_RATIO  = 0.15
 
 OUTPUT_DIR  = Path("./member2_work/outputs")
 
+# Cross‑validation settings
+N_FOLDS = 5
+USE_CV = False  # Set to True via CLI flag "--cross-validation" or env var USE_CV=1
+
 
 # 5. LABEL HANDLING
 
