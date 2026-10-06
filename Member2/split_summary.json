@@ -1,0 +1,25 @@
+{
+  "generated_at": "2026-10-06T06:39:55.587228",
+  "seed": 42,
+  "split_method": "study-level; exact counts for gold and non-gold",
+  "total_studies": 4407,
+  "gold_labeled": 58,
+  "non_gold": 4349,
+  "splits": {
+    "train": {
+      "gold": 30,
+      "non_gold": 3055,
+      "total": 3085
+    },
+    "val": {
+      "gold": 14,
+      "non_gold": 647,
+      "total": 661
+    },
+    "test": {
+      "gold": 14,
+      "non_gold": 647,
+      "total": 661
+    }
+  }
+}
