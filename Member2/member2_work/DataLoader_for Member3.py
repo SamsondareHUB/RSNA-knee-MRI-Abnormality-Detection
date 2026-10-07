@@ -1,78 +1,94 @@
 import os
 import sys
 import subprocess
+import argparse
 
-
-# 1. CLONE MEMBER 2's REPOSITORY
-
-# GitHub repository URL provided by Member 2
-REPO_URL = "https://github.com/SamsondareHUB/RSNA-knee-MRI-Abnormality-Detection.git"
-
-# Define the clone directory based on the environment
-# Use "/content/..." for Google Colab, or "/kaggle/working/..." for Kaggle Notebook
-CLONE_DIR = "/content/RSNA-knee-MRI-Abnormality-Detection" 
-
-if not os.path.exists(CLONE_DIR):
-    print("📥 Cloning Member 2's repository...")
-    subprocess.run(["git", "clone", REPO_URL, CLONE_DIR], check=True)
-else:
-    print("✅ Repository already exists. Pulling latest changes...")
-    subprocess.run(["git", "-C", CLONE_DIR, "pull"], check=True)
-
-
-# 2. ADD MEMBER 2's CODE TO SYSTEM PATH
-
-# This is the folder containing Member 2's 'datasets.py' file
-MEMBER2_WORK_PATH = os.path.join(CLONE_DIR, "Member2", "member2_work")
-
+# ------------------------------------------------------------
+# 1. CONFIGURE PATHS – add Member 2's working directory to sys.path
+# ------------------------------------------------------------
+# Determine the absolute path to the local Member 2 code (no cloning needed).
+MEMBER2_WORK_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "member2_work")
+)
 if MEMBER2_WORK_PATH not in sys.path:
     sys.path.append(MEMBER2_WORK_PATH)
-    print(f"✅ Added to system path: {MEMBER2_WORK_PATH}")
+    print(f"✅ Added Member 2 work path to sys.path: {MEMBER2_WORK_PATH}")
 else:
-    print("✅ Path already in system path.")
+    print("✅ Member 2 work path already in sys.path")
 
-# ==========================================
-# 3. IMPORT MEMBER 2's DATALOADER FUNCTION
-# ==========================================
+# ------------------------------------------------------------
+# 2. COMMAND‑LINE / ENV‑VAR configuration for CSV locations & data root
+# ------------------------------------------------------------
+parser = argparse.ArgumentParser(
+    description="Initialize DataLoaders for Member 3 using Member 2's split CSVs"
+)
+parser.add_argument(
+    "--train-csv",
+    default=os.getenv(
+        "TRAIN_CSV_PATH",
+        os.path.join(MEMBER2_WORK_PATH, "outputs", "train_split.csv"),
+    ),
+    help="Path to the training split CSV (default: env TRAIN_CSV_PATH or ./outputs/train_split.csv)",
+)
+parser.add_argument(
+    "--val-csv",
+    default=os.getenv(
+        "VAL_CSV_PATH",
+        os.path.join(MEMBER2_WORK_PATH, "outputs", "val_split.csv"),
+    ),
+    help="Path to the validation split CSV (default: env VAL_CSV_PATH or ./outputs/val_split.csv)",
+)
+parser.add_argument(
+    "--data-root",
+    default=os.getenv(
+        "DATA_ROOT",
+        "/kaggle/input/rsna-knee-abnormality-detection/",
+    ),
+    help="Root directory containing the DICOM series folders",
+)
+parser.add_argument(
+    "--batch-size",
+    type=int,
+    default=int(os.getenv("BATCH_SIZE", "16")),
+    help="Batch size for the DataLoaders (default: 16)",
+)
+parser.add_argument(
+    "--num-workers",
+    type=int,
+    default=int(os.getenv("NUM_WORKERS", "2")),
+    help="Number of DataLoader worker processes (default: 2; set 0 on Windows/Colab)",
+)
+args = parser.parse_args()
+
+# ------------------------------------------------------------
+# 3. IMPORT MEMBER 2's DataLoader helper
+# ------------------------------------------------------------
 try:
     from datasets import get_dataloaders
-    print("✅ Successfully imported 'get_dataloaders' from Member 2's code.")
+    print("✅ Successfully imported 'get_dataloaders' from Member 2's code.")
 except ImportError as e:
-    print(f"❌ Failed to import. Error: {e}")
-    print("Please ensure Member 2 has uploaded 'datasets.py' to the GitHub repository.")
+    print(f"❌ Failed to import get_dataloaders: {e}")
+    sys.exit(1)
 
-# ==========================================
-# 4. SETUP PATHS FOR DATA AND CSV FILES
-# ==========================================
-# Path to the DICOM data (Kaggle Competition Data)
-# If using Kaggle: "/kaggle/input/rsna-knee-abnormality-detection/"
-# If using Colab: Update this to the path where you downloaded the data
-DATA_ROOT = "/kaggle/input/rsna-knee-abnormality-detection/"
-
-# Path to the split CSVs created by Member 2
-TRAIN_CSV_PATH = os.path.join(MEMBER2_WORK_PATH, "outputs", "train_split.csv")
-VAL_CSV_PATH = os.path.join(MEMBER2_WORK_PATH, "outputs", "val_split.csv")
-
-# ==========================================
-# 5. INITIALIZE DATALOADERS
-# ==========================================
+# ------------------------------------------------------------
+# 4. INITIALIZE DataLoaders using the supplied arguments
+# ------------------------------------------------------------
 print("\n--- Initializing DataLoaders ---")
 try:
     train_loader, val_loader = get_dataloaders(
-        train_csv_path=TRAIN_CSV_PATH,
-        val_csv_path=VAL_CSV_PATH,
-        data_root=DATA_ROOT,
-        batch_size=16,   # Lower this to 8 or 4 if you run out of memory
-        num_workers=2    # Set to 0 if using Windows/Colab and encountering errors
+        train_csv_path=args.train_csv,
+        val_csv_path=args.val_csv,
+        data_root=args.data_root,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
     )
-    
-    # Test the DataLoader
+
+    # Simple sanity‑check: fetch one batch
     for images, labels in train_loader:
         print("✅ DataLoader is working correctly.")
-        print("Image batch shape:", images.shape) # Expected: [16, 1, 224, 224]
-        print("Label batch shape:", labels.shape) # Expected: [16, 7]
+        print(f"Image batch shape: {images.shape}")  # Expected: [B, 1, 224, 224]
+        print(f"Label batch shape: {labels.shape}")  # Expected: [B, 7]
         break
-        
 except Exception as e:
     print(f"❌ Error initializing DataLoaders: {e}")
-    print("Check if Member 2's CSV files exist at the specified paths.")
+    print("Check that the CSV files exist and that DATA_ROOT points to the DICOM series directory.")
