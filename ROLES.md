@@ -1,12 +1,14 @@
 # Team Roles
 
 ## Member 1 — Project Lead & Deep-Learning Lead
+- Names: 
 - Defines the research question and experiment plan
 - Oversees model design and ablations
 - Reviews all results
 - Integrates the final manuscript, code, figures, and tables
 
 ## Member 2 — Data Engineer
+- Names: Daniel Koilpillai
 - Downloads and verifies the RSNA dataset
 - Builds preprocessing and data-loading pipeline
 - Creates the train/validation/test split
