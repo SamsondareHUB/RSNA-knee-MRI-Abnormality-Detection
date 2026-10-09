@@ -97,6 +97,16 @@ def load_series(series_csv, has_series):
     return df
 
 # ============================================================
+
+def load_approved_split(split_path: Path) -> pd.DataFrame:
+    """Load the approved split CSV (must contain the split and is_gold columns)."""
+    df = pd.read_csv(split_path)
+    required = {STUDY_ID_COL, "split", "is_gold"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Approved split file {split_path} missing columns: {missing}")
+    return df
+
 # STEP 3 — MERGE
 # ============================================================
 def merge_data(labels_df, series_df):
@@ -307,8 +317,10 @@ def write_split_csvs(df, out_dir):
     """Write train_split.csv and val_split.csv based on the 'split' column.
     Only the StudyInstanceUID column and label columns are saved.
     """
-    train_df = df[df["split"] == "train"]
-    val_df = df[df["split"] == "val"]
+    # Compute gold label mask (any non‑NaN label)
+    gold_mask = df[LABELS].notna().any(axis=1)
+    train_df = df[(df["split"] == "train") & gold_mask]
+    val_df = df[(df["split"] == "val") & gold_mask]
     cols = [STUDY_ID_COL] + LABELS
     cols = [c for c in cols if c in df.columns]
     train_path = out_dir / "train_split.csv"
@@ -326,6 +338,7 @@ def main():
     parser.add_argument("--labels-csv", type=Path, default=Path(os.getenv("LABELS_CSV_PATH", str(CONFIG_LABELS_CSV))), help="Path to the labels CSV (default from config or env var)")
     parser.add_argument("--series-csv", type=Path, default=Path(os.getenv("SERIES_CSV_PATH", str(CONFIG_SERIES_CSV))), help="Path to the series CSV (default from config or env var)")
     parser.add_argument("--output-dir", type=Path, default=Path(os.getenv("OUTPUT_DIR", str(CONFIG_OUTPUT_DIR))), help="Directory where outputs will be written (default from config or env var)")
+    parser.add_argument("--recompute", action="store_true", help="Recompute splits (default: use approved split CSV)")
     args = parser.parse_args()
     # Override globals for downstream functions
     global LABELS_CSV, SERIES_CSV, OUTPUT_DIR
@@ -342,7 +355,15 @@ def main():
     series_df = load_series(SERIES_CSV, has_series)
     merged = merge_data(labels_df, series_df)
     merged = add_group_ids(merged)
-    merged = create_splits(merged, seed=SEED)
+    if args.recompute:
+        merged = create_splits(merged, seed=SEED)
+    else:
+        split_path = OUTPUT_DIR / "split_assignments.csv"
+        if not split_path.exists():
+            raise FileNotFoundError(f"Approved split file not found at {split_path}. Use --recompute to generate.")
+        split_df = load_approved_split(split_path)
+        # Merge split assignments and is_gold column into the merged dataframe
+        merged = merged.merge(split_df[[STUDY_ID_COL, "split", "is_gold"]], on=STUDY_ID_COL, how="left")
 
     if not verify_no_leakage(merged):
         raise RuntimeError("Leakage detected!")
