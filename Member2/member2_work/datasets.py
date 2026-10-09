@@ -1,22 +1,16 @@
 import os
 import pandas as pd
 import numpy as np
-try:
-    import pydicom
-except ImportError:
-    pydicom = None
+import pydicom
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
 from PIL import Image
+from config import LABELS
 
 # 1. Configuration
 
-# The 7 labels found in terminal output
-LABEL_COLUMNS = [
-    'ACL', 'MCL', 'Medial Meniscus', 'Lateral Meniscus',
-    'Medial OA', 'Lateral OA', 'PF OA'
-]
+# Use the full label list from config (LABELS).
 
 
 STUDY_ID_COL = 'StudyInstanceUID'
@@ -45,7 +39,7 @@ class KneeMRIDataset(Dataset):
     def __getitem__(self, idx):
         # 1. Extract Study ID and Labels
         study_id = self.dataframe.iloc[idx][STUDY_ID_COL]
-        labels = self.dataframe.iloc[idx][LABEL_COLUMNS].values.astype(np.float32)
+        labels = self.dataframe.iloc[idx][LABELS].values.astype(np.float32)
         labels = torch.tensor(labels, dtype=torch.float32)
 
         # 2. Construct the path to the patient's DICOM folder
@@ -61,22 +55,30 @@ class KneeMRIDataset(Dataset):
 
         # 4. Read the DICOM files and extract an image (Middle Slice approach)
         if len(dicom_files) == 0:
-            # If no files found, return a black image to prevent crashing
-            image = np.zeros((224, 224), dtype=np.float32)
+            # No DICOM files – raise explicit error
+            raise FileNotFoundError(f"No DICOM files found for study {study_id} in {patient_folder}")
         else:
             dicom_files.sort() # Sort files to ensure consistency
             middle_idx = len(dicom_files) // 2
             target_file = dicom_files[middle_idx]
             
             try:
+                # Read DICOM and apply rescale
                 dicom_data = pydicom.dcmread(target_file)
                 image = dicom_data.pixel_array.astype(float)
-                
-                # Normalize the image to 0-1 range
+                # Apply DICOM rescale slope/intercept if present
+                slope = getattr(dicom_data, "RescaleSlope", 1.0)
+                intercept = getattr(dicom_data, "RescaleIntercept", 0.0)
+                image = image * slope + intercept
+                # Clip intensities to robust percentiles (1‑99)
+                low, high = np.percentile(image, [1, 99])
+                image = np.clip(image, low, high)
+                # Normalize to [0, 1]
                 if image.max() > image.min():
                     image = (image - image.min()) / (image.max() - image.min())
                 else:
                     image = np.zeros_like(image)
+                # End of DICOM processing
             except Exception as e:
                 print(f"Error reading {target_file}: {e}")
                 image = np.zeros((224, 224), dtype=np.float32)
@@ -92,7 +94,7 @@ class KneeMRIDataset(Dataset):
 
 # 3. Helper Function for Member 3
 
-def get_dataloaders(train_csv_path, val_csv_path, data_root=KAGGLE_DATA_PATH, batch_size=16, num_workers=2):
+def get_dataloaders(train_csv_path, val_csv_path, test_csv_path=None, data_root=KAGGLE_DATA_PATH, batch_size=16, num_workers=2):
     """
     Creates and returns training and validation DataLoaders.
     This is the function Member 3 will import and use.
@@ -112,18 +114,22 @@ def get_dataloaders(train_csv_path, val_csv_path, data_root=KAGGLE_DATA_PATH, ba
     train_series_path = os.path.join(data_root, "train_series")
 
     # Create Datasets
-    train_dataset = KneeMRIDataset(train_df, train_series_path, transform=transform)
-    val_dataset = KneeMRIDataset(val_df, train_series_path, transform=transform)
+    # Optionally create test dataset and loader if a test CSV is provided
+    test_loader = None
+    if test_csv_path is not None:
+        test_df = pd.read_csv(test_csv_path)
+        test_dataset = KneeMRIDataset(test_df, train_series_path, transform=transform)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
+
 
     # Create DataLoaders
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
 
-    print(f"✅ DataLoaders Ready!")
-    print(f"   Train Batches: {len(train_loader)} | Val Batches: {len(val_loader)}")
+    print(f"✅ DataLoaders Ready!   Train:{len(train_loader)} Val:{len(val_loader)}" + (f" Test:{len(test_loader)}" if test_loader else ""))
     
-    return train_loader, val_loader
+    return train_loader, val_loader, test_loader
 
 
 
