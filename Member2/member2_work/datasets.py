@@ -106,7 +106,13 @@ def get_dataloaders(train_csv_path, val_csv_path, data_root=KAGGLE_DATA_PATH, ba
 
     # Load the split CSVs
     train_df = pd.read_csv(train_csv_path)
-    val_df = pd.read_csv(val_csv_path)
+train_df = train_df[train_df["is_gold"] == 1].reset_index(drop=True)
+
+val_df = pd.read_csv(val_csv_path)
+val_df = val_df[val_df["is_gold"] == 1].reset_index(drop=True)
+
+test_df = pd.read_csv(test_csv_path)
+test_df = test_df[test_df["is_gold"] == 1].reset_index(drop=True)
 
     # Define the path to the DICOM series folder
     train_series_path = os.path.join(data_root, "train_series")
