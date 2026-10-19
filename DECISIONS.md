@@ -61,3 +61,14 @@
 - Rationale: NaN labels cannot be used in binary cross-entropy. The split files remain unchanged.
 - Consequence: Experiment 001 will train on 30 gold studies, validate on 14, and test on 14.
 - Limitation: This is sufficient for pipeline validation but not for strong performance claims. The paper must clearly report the small labeled sample size.
+
+- ## Decision 8 — DataLoader sanity check passed
+
+- Date: 2026-10-19
+- Result:
+  - Train: 30 gold studies
+  - Val: 14 gold studies
+  - Test: 14 gold studies
+  - One batch: images [4, 1, 224, 224], labels [4, 12], 0 NaN labels
+- Decision: DataLoader is approved for Experiment 001.
+- Next: Train baseline ResNet50 + mean pooling on the 30 gold training studies.
