@@ -1,0 +1,49 @@
+{
+  "split": "val",
+  "input_type": "probabilities",
+  "labels": [
+    "ACL",
+    "MCL",
+    "Medial Meniscus",
+    "Lateral Meniscus",
+    "Medial OA",
+    "Lateral OA",
+    "PF OA",
+    "Effusion",
+    "Synovitis",
+    "Baker's",
+    "Contusion",
+    "Fracture"
+  ],
+  "inputs": {
+    "gold_csv": {
+      "name": "train.csv",
+      "sha256": "e9bad94012ac6dcc5b85142fc91b1d3af3a8a3418f6b516fa5b96ddc6060fc91"
+    },
+    "split_csv": {
+      "name": "split.csv",
+      "sha256": "d0367d6a132b397cea3e60fd4a7963451904f5e69b736bdc6b1c1c691e93936a"
+    },
+    "predictions_csv": {
+      "name": "experiment001_val_predictions.csv",
+      "sha256": "fce1bd98827b574c1dd32357c29b465b5a59caec92d621471979144e432e22eb"
+    },
+    "split_summary": {
+      "name": "split_summary.json",
+      "sha256": "51a68dfe3d4fcae60f678e89f6fba4c025abe8142c999224432002648852d7a6"
+    }
+  },
+  "software_versions": {
+    "python": "3.11.9",
+    "numpy": "2.4.6",
+    "pandas": "3.0.5",
+    "scikit_learn": "1.9.0"
+  },
+  "split_studies": 661,
+  "expected_gold_studies": 14,
+  "scored_gold_studies": 14,
+  "excluded_non_gold_predictions": 0,
+  "non_gold_studies_without_predictions": 647,
+  "patient_overlap_audit": "unavailable: no verified patient ID column",
+  "selection_record": null
+}
