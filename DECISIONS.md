@@ -52,3 +52,23 @@
 - All 12 abnormalities have at least 1 positive in each split.
 - Some labels are rare in val/test (e.g., Lateral OA, MCL injury, Baker’s cyst), so AUROC estimates for those labels will have higher variance. This is acceptable for a first baseline.
 - Decision: Use this split for Experiment 001 and subsequent experiments unless a major issue arises.
+
+- ## Decision 7 — Use only gold-labeled studies in DataLoader and evaluation
+
+- Date: 2026-10-10
+- Problem: Non-gold studies have NaN labels, causing NaN loss and NaN weights during training.
+- Decision: Filter each split to `is_gold == 1` inside `datasets.py` and the evaluation pipeline.
+- Rationale: NaN labels cannot be used in binary cross-entropy. The split files remain unchanged.
+- Consequence: Experiment 001 will train on 30 gold studies, validate on 14, and test on 14.
+- Limitation: This is sufficient for pipeline validation but not for strong performance claims. The paper must clearly report the small labeled sample size.
+
+- ## Decision 8 — DataLoader sanity check passed
+
+- Date: 2026-10-19
+- Result:
+  - Train: 30 gold studies
+  - Val: 14 gold studies
+  - Test: 14 gold studies
+  - One batch: images [4, 1, 224, 224], labels [4, 12], 0 NaN labels
+- Decision: DataLoader is approved for Experiment 001.
+- Next: Train baseline ResNet50 + mean pooling on the 30 gold training studies.
