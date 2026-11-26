@@ -1,18 +1,17 @@
 import os
 import pandas as pd
 import numpy as np
-try:
-    import pydicom
-except ImportError:
-    pydicom = None
+import pydicom
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
 from PIL import Image
+from config import LABELS
 
 
 # 1. Configuration
 
+# Use the full label list from config (LABELS).
 # IMPORTANT: These names must exactly match the column names in your CSVs.
 LABEL_COLUMNS = [
     'ACL', 'MCL', 'Medial Meniscus', 'Lateral Meniscus',
@@ -38,7 +37,7 @@ class KneeMRIDataset(Dataset):
 
     def __getitem__(self, idx):
         study_id = self.dataframe.iloc[idx][STUDY_ID_COL]
-        labels = self.dataframe.iloc[idx][LABEL_COLUMNS].values.astype(np.float32)
+        labels = self.dataframe.iloc[idx][LABELS].values.astype(np.float32)
         labels = torch.tensor(labels, dtype=torch.float32)
 
         patient_folder = os.path.join(self.series_root_path, str(study_id))
@@ -51,6 +50,8 @@ class KneeMRIDataset(Dataset):
                         dicom_files.append(os.path.join(root, file))
 
         if len(dicom_files) == 0:
+            # No DICOM files – raise explicit error
+            raise FileNotFoundError(f"No DICOM files found for study {study_id} in {patient_folder}")
             image = np.zeros((224, 224), dtype=np.float32)
         else:
             dicom_files.sort()
@@ -58,13 +59,23 @@ class KneeMRIDataset(Dataset):
             target_file = dicom_files[middle_idx]
 
             try:
+                # Read DICOM and apply rescale
                 dicom_data = pydicom.dcmread(target_file)
                 image = dicom_data.pixel_array.astype(float)
+                # Apply DICOM rescale slope/intercept if present
+                slope = getattr(dicom_data, "RescaleSlope", 1.0)
+                intercept = getattr(dicom_data, "RescaleIntercept", 0.0)
+                image = image * slope + intercept
+                # Clip intensities to robust percentiles (1‑99)
+                low, high = np.percentile(image, [1, 99])
+                image = np.clip(image, low, high)
+                # Normalize to [0, 1]
 
                 if image.max() > image.min():
                     image = (image - image.min()) / (image.max() - image.min())
                 else:
                     image = np.zeros_like(image)
+                # End of DICOM processing
             except Exception as e:
                 print(f"Error reading {target_file}: {e}")
                 image = np.zeros((224, 224), dtype=np.float32)
@@ -79,6 +90,12 @@ class KneeMRIDataset(Dataset):
 
 # 3. Helper Function for Member 3
 
+def get_dataloaders(train_csv_path, val_csv_path, test_csv_path=None, data_root=KAGGLE_DATA_PATH, batch_size=16, num_workers=2):
+    """
+    Creates and returns training and validation DataLoaders.
+    This is the function Member 3 will import and use.
+    """
+    # Define Image Transformations
 def get_dataloaders(train_csv_path, val_csv_path, test_csv_path=None,
                     data_root=KAGGLE_DATA_PATH, batch_size=16, num_workers=2):
 
@@ -102,6 +119,14 @@ def get_dataloaders(train_csv_path, val_csv_path, test_csv_path=None,
 
     train_series_path = os.path.join(data_root, "train_series")
 
+    # Create Datasets
+    # Optionally create test dataset and loader if a test CSV is provided
+    test_loader = None
+    if test_csv_path is not None:
+        test_df = pd.read_csv(test_csv_path)
+        test_dataset = KneeMRIDataset(test_df, train_series_path, transform=transform)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=False)
+
     train_dataset = KneeMRIDataset(train_df, train_series_path, transform=transform)
     val_dataset = KneeMRIDataset(val_df, train_series_path, transform=transform)
 
@@ -116,6 +141,9 @@ def get_dataloaders(train_csv_path, val_csv_path, test_csv_path=None,
         print(f"Test studies: {len(test_df)}")
     print(f"Train batches: {len(train_loader)} | Val batches: {len(val_loader)}")
 
+    print(f"✅ DataLoaders Ready!   Train:{len(train_loader)} Val:{len(val_loader)}" + (f" Test:{len(test_loader)}" if test_loader else ""))
+    
+    return train_loader, val_loader, test_loader
     return train_loader, val_loader
 
 
